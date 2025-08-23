@@ -6,6 +6,12 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
 import connectDB from "./config/db.js";
+import http from "http";
+import { Server } from "socket.io";
+import helmet from "helmet";
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
+import profileRoutes from "./routes/profile.js";
 dotenv.config();
 
 const app = express();
@@ -20,6 +26,81 @@ connectDB()
 app.use(cors());
 app.use(bodyParser.json());
 
+// Security middleware
+app.use(helmet());
+
+// Logging middleware
+app.use(morgan("combined"));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  message: "Too many requests from this IP, please try again later.",
+});
+app.use("/api", limiter);
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "BrewOps API is running",
+    timestamp: new Date().toISOString(),
+    version: "1.0.0",
+  });
+});
+
+// API documentation endpoint
+app.get("/api", (req, res) => {
+  res.json({
+    success: true,
+    message: "BrewOps API",
+
+    version: "1.0.0",
+    endpoints: {
+      users: {
+        list: "GET /api/users",
+        search: "GET /api/users?search=query",
+        getUser: "GET /api/users/:id",
+        updateStatus: "PUT /api/users/:id/status",
+      },
+      messages: {
+        list: "GET /api/messages",
+        chat: "GET /api/messages/chat/:userId",
+        send: "POST /api/messages/send",
+        markRead: "PATCH /api/messages/:messageId/read",
+        markAllRead: "POST /api/messages/mark-all-read/:userId",
+      },
+      notifications: {
+        list: "GET /api/notifications",
+        unreadCount: "GET /api/notifications/unread-count",
+        getNotification: "GET /api/notifications/:id",
+        markRead: "PATCH /api/notifications/:id/read",
+        markAllRead: "POST /api/notifications/mark-all-read",
+        create: "POST /api/notifications",
+        delete: "DELETE /api/notifications/:id",
+      },
+      profile: {
+        get: "GET /api/profile",
+        basic: "GET /api/profile/basic",
+        update: "PUT /api/profile",
+        changePassword: "POST /api/profile/change-password",
+        uploadAvatar: "POST /api/profile/upload-avatar",
+        stats: "GET /api/profile/stats",
+        permissions: "GET /api/profile/permissions",
+        updatePreferences: "PUT /api/profile/preferences",
+        deactivate: "POST /api/profile/deactivate",
+      },
+    },
+  });
+});
+
+// Public routes (login, registration)
+app.use("/api/users", authRoutes);
+app.use("/api/admin", authRoutes);
+app.use("/inventory", inventoryRoutes);
+
+// JWT authentication middleware for protected routes only
 app.use((req, res, next) => {
   const tokenString = req.header("Authorization");
   if (tokenString != null) {
@@ -42,10 +123,51 @@ app.use((req, res, next) => {
   }
 });
 
-app.use("/api/users", authRoutes);
-app.use("/api/admin", authRoutes);
-app.use("/inventory", inventoryRoutes);
+// Protected profile routes
+app.use("/api/profile", profileRoutes);
 
-app.listen(5000, () => {
-  console.log("Server is running on port 5000");
+// WebSocket server setup
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"],
+  },
+});
+
+// 404 handler for API routes
+app.use("/api/*", (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: "API endpoint not found",
+    path: req.path,
+    method: req.method,
+  });
+});
+
+// Global error handler
+app.use((error, req, res, next) => {
+  console.error("Global error handler:", error);
+  res.status(error.status || 500).json({
+    success: false,
+    error: error.message || "Internal server error",
+    ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
+  });
+});
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received. Shutting down gracefully...");
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received. Shutting down gracefully...");
+  process.exit(0);
+});
+
+// Start the server
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });
