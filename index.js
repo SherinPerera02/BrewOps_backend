@@ -5,6 +5,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
+import messagesRoutes from "./routes/messages.js";
+import notificationsRoutes from "./routes/notifications.js";
+import usersRoutes from "./routes/users.js";
 import connectDB from "./config/db.js";
 import http from "http";
 import { Server } from "socket.io";
@@ -125,6 +128,9 @@ app.use((req, res, next) => {
 
 // Protected profile routes
 app.use("/api/profile", profileRoutes);
+app.use("/api/messages", messagesRoutes);
+app.use("/api/notifications", notificationsRoutes);
+app.use("/api/users", usersRoutes);
 
 // WebSocket server setup
 const server = http.createServer(app);
@@ -133,6 +139,46 @@ const io = new Server(server, {
     origin: "http://localhost:5173",
     methods: ["GET", "POST"],
   },
+});
+
+// Real-time notifications/messages
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  // Example: emit notifications and messages periodically
+  const notifInterval = setInterval(() => {
+    socket.emit("notification", {
+      id: Date.now(),
+      title: "Production Update",
+      message: "Daily production target achieved successfully!",
+      body: "Daily production target achieved successfully!",
+      time: "Just now",
+      read: false,
+      isNew: true,
+      type: "production",
+      priority: "high",
+    });
+  }, 10000);
+
+  const msgInterval = setInterval(() => {
+    socket.emit("message", {
+      id: Date.now() + 1,
+      senderId: "manager",
+      senderName: "Production Manager",
+      senderRole: "Manager",
+      senderInitials: "PM",
+      body: "Hello! How is production going today?",
+      time: "Just now",
+      read: false,
+      unread: true,
+    });
+  }, 15000);
+
+  socket.on("disconnect", () => {
+    clearInterval(notifInterval);
+    clearInterval(msgInterval);
+    console.log("User disconnected:", socket.id);
+  });
 });
 
 // 404 handler for API routes

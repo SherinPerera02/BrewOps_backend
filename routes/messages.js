@@ -172,7 +172,7 @@ router.get("/", (req, res) => {
     res.json({ success: true, data: conversations });
   } catch (error) {
     console.error("Error fetching messages:", error);
-    res.status(500).json([]);
+    res.status(500).json({ success: false, error: "Failed to fetch messages" });
   }
 });
 
@@ -195,7 +195,9 @@ router.get("/chat/:userId", (req, res) => {
     res.json({ success: true, data: formattedMessages });
   } catch (error) {
     console.error("Error fetching chat history:", error);
-    res.status(500).json([]);
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch chat history" });
   }
 });
 
@@ -352,4 +354,4 @@ function getTimestampFromConversation(userId) {
   return lastMessage.timestamp ? lastMessage.timestamp.getTime() : 0;
 }
 
-module.exports = router;
+export default router;

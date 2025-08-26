@@ -1,4 +1,4 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
 
 // Mock user list - replace with DB query in production
@@ -81,7 +81,7 @@ router.get("/", (req, res) => {
       );
     }
 
-    res.json(filtered);
+    res.json({ success: true, data: filtered });
   } catch (error) {
     res.status(500).json([]);
   }
@@ -94,10 +94,10 @@ router.get("/:id", (req, res) => {
     const user = users.find((u) => u.id === userId);
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    res.json(user);
+    res.json({ success: true, data: user });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -111,7 +111,7 @@ router.put("/:id/status", (req, res) => {
     const user = users.find((u) => u.id === userId);
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ success: false, error: "User not found" });
     }
 
     user.online = online;
@@ -121,4 +121,4 @@ router.put("/:id/status", (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

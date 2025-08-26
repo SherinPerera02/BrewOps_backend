@@ -1,4 +1,4 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
 
 // Mock data - replace with your database queries
@@ -121,7 +121,9 @@ router.get("/", (req, res) => {
     res.json({ success: true, data: formattedNotifications });
   } catch (error) {
     console.error("Error fetching notifications:", error);
-    res.status(500).json([]);
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch notifications" });
   }
 });
 
@@ -328,4 +330,4 @@ function formatTimeAgo(date) {
   });
 }
 
-module.exports = router;
+export default router;
