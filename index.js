@@ -8,6 +8,7 @@ import inventoryRoutes from "./routes/inventoryRoutes.js";
 import messagesRoutes from "./routes/messages.js";
 import notificationsRoutes from "./routes/notifications.js";
 import usersRoutes from "./routes/users.js";
+import supplierRoutes from "./routes/supplierRoutes.js";
 import connectDB from "./config/db.js";
 import http from "http";
 import { Server } from "socket.io";
@@ -101,6 +102,9 @@ app.get("/api", (req, res) => {
 // Public routes (login, registration)
 app.use("/api/users", authRoutes);
 app.use("/api/admin", authRoutes);
+app.use("/api/inventory", inventoryRoutes);
+
+// Legacy route for frontend compatibility
 app.use("/inventory", inventoryRoutes);
 
 // JWT authentication middleware for protected routes only
@@ -128,6 +132,7 @@ app.use((req, res, next) => {
 
 // Protected profile routes
 app.use("/api/profile", profileRoutes);
+app.use("/api/suppliers", supplierRoutes);
 app.use("/api/messages", messagesRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/users", usersRoutes);
@@ -145,38 +150,36 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // Example: emit notifications and messages periodically
-  const notifInterval = setInterval(() => {
-    socket.emit("notification", {
-      id: Date.now(),
-      title: "Production Update",
-      message: "Daily production target achieved successfully!",
-      body: "Daily production target achieved successfully!",
-      time: "Just now",
-      read: false,
-      isNew: true,
-      type: "production",
-      priority: "high",
-    });
-  }, 10000);
+  // Join user to their own room for targeted messages
+  socket.on("join", (userId) => {
+    socket.join(`user_${userId}`);
+    console.log(`User ${userId} joined their room`);
+  });
 
-  const msgInterval = setInterval(() => {
-    socket.emit("message", {
-      id: Date.now() + 1,
-      senderId: "manager",
-      senderName: "Production Manager",
-      senderRole: "Manager",
-      senderInitials: "PM",
-      body: "Hello! How is production going today?",
-      time: "Just now",
-      read: false,
-      unread: true,
+  // Handle real-time message sending
+  socket.on("sendMessage", (data) => {
+    // Emit to the receiver's room
+    socket.to(`user_${data.receiverId}`).emit("newMessage", {
+      id: data.id,
+      senderId: data.senderId,
+      senderName: data.senderName,
+      message: data.message,
+      time: data.time,
+      timestamp: data.timestamp,
     });
-  }, 15000);
+  });
+
+  // Handle message read notifications
+  socket.on("messageRead", (data) => {
+    // Notify the sender that their message was read
+    socket.to(`user_${data.senderId}`).emit("messageRead", {
+      messageId: data.messageId,
+      readBy: data.readBy,
+      timestamp: new Date(),
+    });
+  });
 
   socket.on("disconnect", () => {
-    clearInterval(notifInterval);
-    clearInterval(msgInterval);
     console.log("User disconnected:", socket.id);
   });
 });

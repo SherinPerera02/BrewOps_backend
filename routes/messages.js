@@ -1,175 +1,185 @@
 import express from "express";
+import connectDB from "../config/db.js";
 
 const router = express.Router();
 
-// Mock current user ID - replace with actual user from JWT token
-const CURRENT_USER_ID = "current_user";
+// GET /api/messages/search-users - Search users by name
+router.get("/search-users", async (req, res) => {
+  try {
+    const currentUserId = req.user?.id;
+    const { query } = req.query;
 
-// Mock users data for reference
-const users = {
-  current_user: {
-    id: "current_user",
-    name: "Current User",
-    avatar: "CU",
-    role: "Manager",
-  },
-  vimalaweera: {
-    id: "vimalaweera",
-    name: "M P S K M Vimalaweera",
-    avatar: "MV",
-    role: "Production Manager",
-  },
-  weerasiri: {
-    id: "weerasiri",
-    name: "L D S N S Weerasiri",
-    avatar: "LW",
-    role: "Quality Control Manager",
-  },
-  perera: {
-    id: "perera",
-    name: "S M Perera",
-    avatar: "SP",
-    role: "Factory Supervisor",
-  },
-  manager: {
-    id: "manager",
-    name: "Production Manager",
-    avatar: "PM",
-    role: "Production Manager",
-  },
-};
+    if (!currentUserId) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
 
-// In-memory chat history for demonstration
-const chatHistory = {
-  vimalaweera: [
-    {
-      id: 1,
-      senderId: "current_user",
-      message: "Hello Vimalaweera! How is the production going today?",
-      time: "10:30",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      read: true,
-    },
-    {
-      id: 2,
-      senderId: "vimalaweera",
-      message:
-        "Hi! Production is running smoothly. We're on target for today's quota.",
-      time: "10:32",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000 + 2 * 60 * 1000),
-      read: true,
-    },
-    {
-      id: 3,
-      senderId: "vimalaweera",
-      message: "I'll send the detailed report by evening.",
-      time: "10:33",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000 + 3 * 60 * 1000),
-      read: false,
-    },
-  ],
-  weerasiri: [
-    {
-      id: 4,
-      senderId: "current_user",
-      message: "Hello Weerasiri! Can you check the quality parameters?",
-      time: "Yesterday",
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-      read: true,
-    },
-    {
-      id: 5,
-      senderId: "weerasiri",
-      message: "Ow akka, I'll check them right away.",
-      time: "Yesterday",
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000 + 10 * 60 * 1000),
-      read: false,
-    },
-  ],
-  perera: [
-    {
-      id: 6,
-      senderId: "current_user",
-      message: "Hello Perera! How are the workers doing?",
-      time: "Monday",
-      timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-      read: true,
-    },
-    {
-      id: 7,
-      senderId: "perera",
-      message:
-        "Everyone is working well. Thanks for the update on the new procedures.",
-      time: "Monday",
-      timestamp: new Date(
-        Date.now() - 3 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000
-      ),
-      read: true,
-    },
-  ],
-};
+    if (!query) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Search query is required" });
+    }
+
+    const db = await connectDB();
+    const [users] = await db.execute(
+      `
+      SELECT id, name, email, role, employee_id
+      FROM users 
+      WHERE id != ? AND (
+        name LIKE ? OR 
+        email LIKE ? OR 
+        role LIKE ? OR 
+        employee_id LIKE ?
+      )
+      LIMIT 10
+    `,
+      [currentUserId, `%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]
+    );
+
+    const formattedUsers = users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      employee_id: user.employee_id,
+      initials: getInitials(user.name),
+    }));
+
+    res.json({ success: true, data: formattedUsers });
+  } catch (error) {
+    console.error("Error searching users:", error);
+    res.status(500).json({ success: false, error: "Failed to search users" });
+  }
+});
+
+// POST /api/messages/send-by-name - Send message by user name
+router.post("/send-by-name", async (req, res) => {
+  try {
+    const senderId = req.user?.id;
+    const { receiverName, message } = req.body;
+
+    if (!senderId) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    if (!receiverName || !message) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Missing receiverName or message" });
+    }
+
+    const db = await connectDB();
+
+    // Find receiver by name
+    const [receivers] = await db.execute(
+      "SELECT id, name, role FROM users WHERE name LIKE ? LIMIT 1",
+      [`%${receiverName}%`]
+    );
+
+    if (receivers.length === 0) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    const receiver = receivers[0];
+
+    // Insert message
+    const [result] = await db.execute(
+      "INSERT INTO messages (sender_id, receiver_id, message) VALUES (?, ?, ?)",
+      [senderId, receiver.id, message.trim()]
+    );
+
+    const [newMessage] = await db.execute(
+      `SELECT m.*, u.name as sender_name, u.role as sender_role 
+       FROM messages m 
+       JOIN users u ON m.sender_id = u.id 
+       WHERE m.id = ?`,
+      [result.insertId]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        id: newMessage[0].id,
+        senderId: newMessage[0].sender_id,
+        receiverId: receiver.id,
+        receiverName: receiver.name,
+        receiverRole: receiver.role,
+        message: newMessage[0].message,
+        time: formatMessageTime(newMessage[0].timestamp),
+        timestamp: newMessage[0].timestamp,
+        read: false,
+      },
+      message: `Message sent successfully to ${receiver.name}`,
+    });
+  } catch (error) {
+    console.error("Error sending message by name:", error);
+    res.status(500).json({ success: false, error: "Failed to send message" });
+  }
+});
 
 // GET /api/messages - Get all conversation threads
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
   try {
-    const conversations = [];
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
 
-    // Create conversation summaries from chat history
-    Object.keys(chatHistory).forEach((userId) => {
-      const messages = chatHistory[userId];
-      if (messages && messages.length > 0) {
-        const lastMessage = messages[messages.length - 1];
-        const otherUser = users[userId];
+    const db = await connectDB();
+    const [conversations] = await db.execute(
+      `
+      SELECT 
+        m.id, m.sender_id, m.receiver_id, m.message, m.timestamp, m.read_status,
+        u1.name as sender_name, u1.role as sender_role,
+        u2.name as receiver_name, u2.role as receiver_role
+      FROM messages m
+      JOIN users u1 ON m.sender_id = u1.id
+      JOIN users u2 ON m.receiver_id = u2.id
+      WHERE m.id IN (
+        SELECT MAX(id) FROM messages
+        WHERE sender_id = ? OR receiver_id = ?
+        GROUP BY LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id)
+      )
+      ORDER BY m.timestamp DESC
+    `,
+      [currentUserId, currentUserId]
+    );
 
-        if (otherUser && lastMessage) {
-          conversations.push({
-            id: lastMessage.id,
-            senderId:
-              lastMessage.senderId === CURRENT_USER_ID
-                ? CURRENT_USER_ID
-                : userId,
-            senderName:
-              lastMessage.senderId === CURRENT_USER_ID
-                ? users[CURRENT_USER_ID].name
-                : otherUser.name,
-            senderRole:
-              lastMessage.senderId === CURRENT_USER_ID
-                ? users[CURRENT_USER_ID].role
-                : otherUser.role,
-            senderInitials:
-              lastMessage.senderId === CURRENT_USER_ID
-                ? users[CURRENT_USER_ID].avatar
-                : otherUser.avatar,
-            body: lastMessage.message,
-            time: formatMessageTime(lastMessage.timestamp),
-            read: lastMessage.read,
-            unread:
-              !lastMessage.read && lastMessage.senderId !== CURRENT_USER_ID,
-          });
-        }
-      }
+    const formattedConversations = conversations.map((conv) => {
+      // Determine who is the "other" person in the conversation
+      const isCurrentUserSender = conv.sender_id === currentUserId;
+      const otherPersonId = isCurrentUserSender
+        ? conv.receiver_id
+        : conv.sender_id;
+      const otherPersonName = isCurrentUserSender
+        ? conv.receiver_name
+        : conv.sender_name;
+      const otherPersonRole = isCurrentUserSender
+        ? conv.receiver_role
+        : conv.sender_role;
+
+      return {
+        id: conv.id,
+        senderId: conv.sender_id,
+        senderName: conv.sender_name,
+        senderRole: conv.sender_role,
+        senderInitials: getInitials(conv.sender_name),
+        receiverId: conv.receiver_id,
+        receiverName: conv.receiver_name,
+        receiverRole: conv.receiver_role,
+        receiverInitials: getInitials(conv.receiver_name),
+        // For conversation display, show the "other" person's info
+        otherPersonId: otherPersonId,
+        otherPersonName: otherPersonName,
+        otherPersonRole: otherPersonRole,
+        otherPersonInitials: getInitials(otherPersonName),
+        body: conv.message,
+        time: formatMessageTime(conv.timestamp),
+        read: Boolean(conv.read_status),
+        unread: !Boolean(conv.read_status) && conv.sender_id !== currentUserId,
+      };
     });
 
-    // Sort by timestamp (newest first)
-    conversations.sort((a, b) => {
-      const aTime = getTimestampFromConversation(
-        a.senderId === CURRENT_USER_ID
-          ? a.senderId
-          : Object.keys(chatHistory).find(
-              (k) => users[k] && users[k].name === a.senderName
-            )
-      );
-      const bTime = getTimestampFromConversation(
-        b.senderId === CURRENT_USER_ID
-          ? b.senderId
-          : Object.keys(chatHistory).find(
-              (k) => users[k] && users[k].name === b.senderName
-            )
-      );
-      return bTime - aTime;
-    });
-
-    res.json({ success: true, data: conversations });
+    res.json({ success: true, data: formattedConversations });
   } catch (error) {
     console.error("Error fetching messages:", error);
     res.status(500).json({ success: false, error: "Failed to fetch messages" });
@@ -177,19 +187,48 @@ router.get("/", (req, res) => {
 });
 
 // GET /api/messages/chat/:userId - Get chat history with specific user
-router.get("/chat/:userId", (req, res) => {
+router.get("/chat/:userId", async (req, res) => {
   try {
-    const userId = req.params.userId;
-    const messages = chatHistory[userId] || [];
+    const currentUserId = req.user?.id;
+    const otherUserId = req.params.userId;
 
-    // Format messages for frontend
+    if (!currentUserId) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    const db = await connectDB();
+
+    // Get both sender and receiver information for all messages
+    const [messages] = await db.execute(
+      `
+      SELECT 
+        m.id, m.sender_id, m.receiver_id, m.message, m.timestamp, m.read_status,
+        u1.name as sender_name, u1.role as sender_role,
+        u2.name as receiver_name, u2.role as receiver_role
+      FROM messages m
+      JOIN users u1 ON m.sender_id = u1.id
+      JOIN users u2 ON m.receiver_id = u2.id
+      WHERE (m.sender_id = ? AND m.receiver_id = ?)
+         OR (m.sender_id = ? AND m.receiver_id = ?)
+      ORDER BY m.timestamp ASC
+    `,
+      [currentUserId, otherUserId, otherUserId, currentUserId]
+    );
+
     const formattedMessages = messages.map((msg) => ({
       id: msg.id,
-      senderId: msg.senderId,
+      senderId: msg.sender_id,
+      senderName: msg.sender_name,
+      senderRole: msg.sender_role,
+      senderInitials: getInitials(msg.sender_name),
+      receiverId: msg.receiver_id,
+      receiverName: msg.receiver_name,
+      receiverRole: msg.receiver_role,
+      receiverInitials: getInitials(msg.receiver_name),
       message: msg.message,
-      time: msg.time,
+      time: formatMessageTime(msg.timestamp),
       timestamp: msg.timestamp,
-      read: msg.read,
+      read: Boolean(msg.read_status),
     }));
 
     res.json({ success: true, data: formattedMessages });
@@ -202,132 +241,137 @@ router.get("/chat/:userId", (req, res) => {
 });
 
 // POST /api/messages/send - Send message to a user
-router.post("/send", (req, res) => {
+router.post("/send", async (req, res) => {
   try {
+    const senderId = req.user?.id;
     const { receiverId, message } = req.body;
 
+    if (!senderId) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
     if (!receiverId || !message) {
-      return res.status(400).json({ error: "Missing receiverId or message" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Missing receiverId or message" });
     }
 
-    const newMsg = {
-      id: Date.now(),
-      senderId: CURRENT_USER_ID, // Replace with req.user.id in real app
-      message: message.trim(),
-      time: new Date().toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }),
-      timestamp: new Date(),
-      read: false,
-    };
+    const db = await connectDB();
+    const [result] = await db.execute(
+      "INSERT INTO messages (sender_id, receiver_id, message) VALUES (?, ?, ?)",
+      [senderId, receiverId, message.trim()]
+    );
 
-    // Initialize chat history if it doesn't exist
-    if (!chatHistory[receiverId]) {
-      chatHistory[receiverId] = [];
-    }
-
-    // Add message to chat history
-    chatHistory[receiverId].push(newMsg);
+    // Get the complete message with both sender and receiver information
+    const [newMessage] = await db.execute(
+      `SELECT m.*, 
+       u1.name as sender_name, u1.role as sender_role,
+       u2.name as receiver_name, u2.role as receiver_role
+       FROM messages m 
+       JOIN users u1 ON m.sender_id = u1.id 
+       JOIN users u2 ON m.receiver_id = u2.id
+       WHERE m.id = ?`,
+      [result.insertId]
+    );
 
     res.json({
       success: true,
-      data: newMsg,
+      data: {
+        id: newMessage[0].id,
+        senderId: newMessage[0].sender_id,
+        senderName: newMessage[0].sender_name,
+        senderRole: newMessage[0].sender_role,
+        senderInitials: getInitials(newMessage[0].sender_name),
+        receiverId: newMessage[0].receiver_id,
+        receiverName: newMessage[0].receiver_name,
+        receiverRole: newMessage[0].receiver_role,
+        receiverInitials: getInitials(newMessage[0].receiver_name),
+        message: newMessage[0].message,
+        time: formatMessageTime(newMessage[0].timestamp),
+        timestamp: newMessage[0].timestamp,
+        read: false,
+      },
       message: "Message sent successfully",
     });
   } catch (error) {
     console.error("Error sending message:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to send message",
-    });
+    res.status(500).json({ success: false, error: "Failed to send message" });
   }
 });
 
 // PATCH /api/messages/:messageId/read - Mark message as read
-router.patch("/:messageId/read", (req, res) => {
+router.patch("/:messageId/read", async (req, res) => {
   try {
-    const messageId = parseInt(req.params.messageId);
-    let found = false;
+    const currentUserId = req.user?.id;
+    const messageId = req.params.messageId;
 
-    // Find and mark message as read
-    Object.keys(chatHistory).forEach((userId) => {
-      chatHistory[userId].forEach((msg) => {
-        if (msg.id === messageId) {
-          msg.read = true;
-          found = true;
-        }
-      });
-    });
-
-    if (found) {
-      res.json({
-        success: true,
-        message: "Message marked as read",
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        error: "Message not found",
-      });
+    if (!currentUserId) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
     }
+
+    const db = await connectDB();
+    await db.execute(
+      "UPDATE messages SET read_status = true WHERE id = ? AND receiver_id = ?",
+      [messageId, currentUserId]
+    );
+
+    res.json({
+      success: true,
+      message: "Message marked as read",
+    });
   } catch (error) {
     console.error("Error marking message as read:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to mark message as read",
-    });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to mark message as read" });
   }
 });
 
 // POST /api/messages/mark-all-read/:userId - Mark all messages from user as read
-router.post("/mark-all-read/:userId", (req, res) => {
+router.post("/mark-all-read/:userId", async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const currentUserId = req.user?.id;
+    const otherUserId = req.params.userId;
 
-    if (chatHistory[userId]) {
-      chatHistory[userId].forEach((msg) => {
-        if (msg.senderId !== CURRENT_USER_ID) {
-          msg.read = true;
-        }
-      });
-
-      res.json({
-        success: true,
-        message: "All messages marked as read",
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        error: "Chat history not found",
-      });
+    if (!currentUserId) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
     }
+
+    const db = await connectDB();
+    await db.execute(
+      "UPDATE messages SET read_status = true WHERE sender_id = ? AND receiver_id = ? AND read_status = false",
+      [otherUserId, currentUserId]
+    );
+
+    res.json({
+      success: true,
+      message: "All messages marked as read",
+    });
   } catch (error) {
     console.error("Error marking all messages as read:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to mark messages as read",
-    });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to mark messages as read" });
   }
 });
 
 // Helper function to format message time
 function formatMessageTime(date) {
   const now = new Date();
+  const messageDate = new Date(date);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const messageDate = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate()
+  const msgDate = new Date(
+    messageDate.getFullYear(),
+    messageDate.getMonth(),
+    messageDate.getDate()
   );
 
-  const diffTime = now - date;
+  const diffTime = now - messageDate;
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-  if (messageDate.getTime() === today.getTime()) {
+  if (msgDate.getTime() === today.getTime()) {
     // Today - show time
-    return date.toLocaleTimeString("en-US", {
+    return messageDate.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
@@ -335,9 +379,9 @@ function formatMessageTime(date) {
   } else if (diffDays === 1) {
     return "Yesterday";
   } else if (diffDays < 7) {
-    return date.toLocaleDateString("en-US", { weekday: "long" });
+    return messageDate.toLocaleDateString("en-US", { weekday: "long" });
   } else {
-    return date.toLocaleDateString("en-US", {
+    return messageDate.toLocaleDateString("en-US", {
       month: "numeric",
       day: "numeric",
       year: "2-digit",
@@ -345,13 +389,15 @@ function formatMessageTime(date) {
   }
 }
 
-// Helper function to get timestamp from conversation
-function getTimestampFromConversation(userId) {
-  if (!userId || !chatHistory[userId] || chatHistory[userId].length === 0) {
-    return 0;
-  }
-  const lastMessage = chatHistory[userId][chatHistory[userId].length - 1];
-  return lastMessage.timestamp ? lastMessage.timestamp.getTime() : 0;
+// Helper function to get initials
+function getInitials(name) {
+  if (!name) return "U";
+  return name
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase()
+    .substring(0, 2);
 }
 
 export default router;

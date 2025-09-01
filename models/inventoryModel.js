@@ -1,13 +1,13 @@
 import connectDB from "../config/db.js";
 
 export default class InventoryModel {
-  static async create({ batchid, inventorynumber, quantity }) {
+  static async create({ inventoryid, quantity }) {
     const connection = await connectDB();
     const [result] = await connection.execute(
-      "INSERT INTO inventory (batchid, inventorynumber, quantity) VALUES (?, ?, ?)",
-      [batchid, inventorynumber, quantity]
+      "INSERT INTO inventory (inventoryid, quantity) VALUES (?, ?)",
+      [inventoryid, quantity]
     );
-    return { id: result.insertId, batchid, inventorynumber, quantity };
+    return { id: result.insertId, inventoryid, quantity };
   }
 
   static async findAll() {
@@ -27,11 +27,11 @@ export default class InventoryModel {
     return rows[0] || null;
   }
 
-  static async updateById(id, { batchid, inventorynumber, quantity }) {
+  static async updateById(id, { inventoryid, quantity }) {
     const connection = await connectDB();
     const [result] = await connection.execute(
-      "UPDATE inventory SET batchid = ?, inventorynumber = ?, quantity = ? WHERE id = ?",
-      [batchid, inventorynumber, quantity, id]
+      "UPDATE inventory SET inventoryid = ?, quantity = ? WHERE id = ?",
+      [inventoryid, quantity, id]
     );
     return result.affectedRows > 0;
   }
