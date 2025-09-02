@@ -8,7 +8,6 @@ import inventoryRoutes from "./routes/inventoryRoutes.js";
 import messagesRoutes from "./routes/messages.js";
 import notificationsRoutes from "./routes/notifications.js";
 import usersRoutes from "./routes/users.js";
-import supplierRoutes from "./routes/supplierRoutes.js";
 import connectDB from "./config/db.js";
 import http from "http";
 import { Server } from "socket.io";
@@ -102,9 +101,6 @@ app.get("/api", (req, res) => {
 // Public routes (login, registration)
 app.use("/api/users", authRoutes);
 app.use("/api/admin", authRoutes);
-app.use("/api/inventory", inventoryRoutes);
-
-// Legacy route for frontend compatibility
 app.use("/inventory", inventoryRoutes);
 
 // JWT authentication middleware for protected routes only
@@ -132,7 +128,6 @@ app.use((req, res, next) => {
 
 // Protected profile routes
 app.use("/api/profile", profileRoutes);
-app.use("/api/suppliers", supplierRoutes);
 app.use("/api/messages", messagesRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/users", usersRoutes);
