@@ -2,7 +2,6 @@ import mysql from "mysql2/promise";
 
 let pool;
 
-// Create connection pool for better performance
 const createPool = () => {
   if (!pool) {
     pool = mysql.createPool({
@@ -21,15 +20,7 @@ const createPool = () => {
   return pool;
 };
 
-// Legacy function for backward compatibility
-export default async function connectDB() {
-  const pool = createPool();
-  // Return a connection from the pool
-  return await pool.getConnection();
-}
-
-// Export the database object with execute and query methods
-export const db = {
+const db = {
   execute: async (query, params = []) => {
     const pool = createPool();
     return await pool.execute(query, params);
@@ -52,3 +43,5 @@ export const db = {
     }
   },
 };
+
+export default db;

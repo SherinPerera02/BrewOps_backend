@@ -4,17 +4,21 @@ import jwt from "jsonwebtoken";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
+import newAuthRoutes from "./routes/newAuthRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
 import messagesRoutes from "./routes/messages.js";
 import notificationsRoutes from "./routes/notifications.js";
 import usersRoutes from "./routes/users.js";
+import profileRoutes from "./routes/profile.js";
+import supplierRoutes from "./routes/supplierRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
+import deliveryRoutes from "./routes/deliveryRoutes.js";
 import connectDB from "./config/db.js";
 import http from "http";
 import { Server } from "socket.io";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
-import profileRoutes from "./routes/profile.js";
 dotenv.config();
 
 const app = express();
@@ -101,6 +105,7 @@ app.get("/api", (req, res) => {
 // Public routes (login, registration)
 app.use("/api/users", authRoutes);
 app.use("/api/admin", authRoutes);
+app.use("/api/auth", newAuthRoutes); // New auth routes for payment module
 app.use("/inventory", inventoryRoutes);
 
 // JWT authentication middleware for protected routes only
@@ -131,6 +136,11 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/messages", messagesRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/users", usersRoutes);
+
+// Payment module routes
+app.use("/api/suppliers", supplierRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/deliveries", deliveryRoutes);
 
 // WebSocket server setup
 const server = http.createServer(app);
