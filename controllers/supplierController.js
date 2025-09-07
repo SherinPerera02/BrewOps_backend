@@ -162,6 +162,34 @@ const supplierController = {
       });
     }
   },
+
+  // @desc    Reactivate supplier
+  // @route   PATCH /api/suppliers/:id/reactivate
+  // @access  Private
+  reactivateSupplier: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await Supplier.update(id, { is_active: true });
+
+      if (success) {
+        res.json({
+          success: true,
+          message: "Supplier reactivated successfully",
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          message: "Supplier not found",
+        });
+      }
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Error reactivating supplier",
+        error: error.message,
+      });
+    }
+  },
 };
 
 export default supplierController;

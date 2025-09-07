@@ -15,6 +15,13 @@ router.get(
   deliveryController.getMonthlySummary
 );
 
+// @route   GET /api/deliveries/supplier/:supplierId
+router.get(
+  "/supplier/:supplierId",
+  protect,
+  deliveryController.getDeliveriesBySupplier
+);
+
 // @route   GET /api/deliveries
 router.get("/", protect, deliveryController.getAllDeliveries);
 

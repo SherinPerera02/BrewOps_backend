@@ -47,15 +47,22 @@ class Supplier {
         rate = 150,
       } = supplierData;
 
-      // Generate supplier ID in format SUP-YYYYMMDD-HHMM
-      const pad = (n) => n.toString().padStart(2, "0");
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = pad(now.getMonth() + 1);
-      const day = pad(now.getDate());
-      const hours = pad(now.getHours());
-      const minutes = pad(now.getMinutes());
-      const supplier_id = `SUP-${year}${month}${day}-${hours}${minutes}`;
+      // Generate sequential supplier ID in format SUP00001, SUP00002, etc.
+      const [lastSupplier] = await db.execute(
+        "SELECT supplier_id FROM suppliers ORDER BY id DESC LIMIT 1"
+      );
+
+      let nextNumber = 1;
+      if (lastSupplier.length > 0 && lastSupplier[0].supplier_id) {
+        // Extract number from last supplier_id (e.g., "SUP00005" -> 5)
+        const lastId = lastSupplier[0].supplier_id;
+        const match = lastId.match(/SUP(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1;
+        }
+      }
+
+      const supplier_id = `SUP${nextNumber.toString().padStart(5, "0")}`;
 
       const [result] = await db.execute(
         "INSERT INTO suppliers (supplier_id, name, contact_number, nic_number, address, bank_account_number, bank_name, rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",

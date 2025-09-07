@@ -40,6 +40,7 @@ async function createDatabase() {
       "04_payments_table.sql",
       "05_payment_statistics_view.sql",
       "06_indexes.sql",
+      "08_update_supplier_ids.sql", // Migration for supplier ID format
     ];
 
     for (const sqlFile of sqlFiles) {

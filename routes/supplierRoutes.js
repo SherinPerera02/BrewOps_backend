@@ -45,4 +45,12 @@ router.delete(
   supplierController.deleteSupplier
 );
 
+// @route   PATCH /api/suppliers/:id/reactivate
+router.patch(
+  "/:id/reactivate",
+  protect,
+  authorize("admin", "manager", "staff"),
+  supplierController.reactivateSupplier
+);
+
 export default router;

@@ -49,6 +49,27 @@ const deliveryController = {
     }
   },
 
+  // @desc    Get deliveries by supplier ID
+  // @route   GET /api/deliveries/supplier/:supplierId
+  // @access  Private
+  getDeliveriesBySupplier: async (req, res) => {
+    try {
+      const deliveries = await Delivery.findBySupplier(req.params.supplierId);
+
+      res.json({
+        success: true,
+        count: deliveries.length,
+        data: deliveries,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Error fetching supplier deliveries",
+        error: error.message,
+      });
+    }
+  },
+
   // @desc    Get monthly summary
   // @route   GET /api/deliveries/monthly-summary/:month
   // @access  Private

@@ -6,7 +6,7 @@ class Delivery {
       const { supplier_id, start_date, end_date } = filters;
 
       let query =
-        "SELECT d.*, s.name as supplier_name FROM deliveries d JOIN suppliers s ON d.supplier_id = s.id WHERE 1=1";
+        "SELECT d.*, s.name as supplier_name, s.supplier_id as supplier_code FROM deliveries d JOIN suppliers s ON d.supplier_id = s.id WHERE 1=1";
       const params = [];
 
       if (supplier_id) {
@@ -36,10 +36,22 @@ class Delivery {
   static async findById(id) {
     try {
       const [rows] = await db.execute(
-        "SELECT d.*, s.name as supplier_name FROM deliveries d JOIN suppliers s ON d.supplier_id = s.id WHERE d.id = ?",
+        "SELECT d.*, s.name as supplier_name, s.supplier_id as supplier_code FROM deliveries d JOIN suppliers s ON d.supplier_id = s.id WHERE d.id = ?",
         [id]
       );
       return rows[0];
+    } catch (error) {
+      throw new Error("Database error: " + error.message);
+    }
+  }
+
+  static async findBySupplier(supplierId) {
+    try {
+      const [rows] = await db.execute(
+        "SELECT d.*, s.name as supplier_name, s.supplier_id as supplier_code FROM deliveries d JOIN suppliers s ON d.supplier_id = s.id WHERE d.supplier_id = ? ORDER BY d.delivery_date DESC",
+        [supplierId]
+      );
+      return rows;
     } catch (error) {
       throw new Error("Database error: " + error.message);
     }

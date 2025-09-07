@@ -155,13 +155,25 @@ const deliveryValidation = {
     body("quantity")
       .isFloat({ min: 0 })
       .withMessage("Quantity must be a positive number"),
-    body("quality_score")
-      .optional()
-      .isInt({ min: 0, max: 100 })
-      .withMessage("Quality score must be between 0-100"),
     body("rate_per_kg")
       .isFloat({ min: 0 })
       .withMessage("Rate per kg must be a positive number"),
+    body("delivery_date")
+      .optional()
+      .isISO8601()
+      .withMessage("Delivery date must be a valid date"),
+    body("payment_method")
+      .optional()
+      .isIn(["monthly", "spot"])
+      .withMessage("Payment method must be 'monthly' or 'spot'"),
+    body("notes")
+      .optional()
+      .isLength({ max: 500 })
+      .withMessage("Notes must not exceed 500 characters"),
+    body("total_amount")
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage("Total amount must be a positive number"),
   ],
 
   update: [
@@ -169,10 +181,6 @@ const deliveryValidation = {
       .optional()
       .isFloat({ min: 0 })
       .withMessage("Quantity must be a positive number"),
-    body("quality_score")
-      .optional()
-      .isInt({ min: 0, max: 100 })
-      .withMessage("Quality score must be between 0-100"),
     body("rate_per_kg")
       .optional()
       .isFloat({ min: 0 })
