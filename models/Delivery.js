@@ -86,19 +86,33 @@ class Delivery {
 
   static async create(deliveryData) {
     try {
-      const { supplier_id, quantity, quality_score, rate_per_kg } =
-        deliveryData;
-      const total_amount = quantity * rate_per_kg;
+      const {
+        supplier_id,
+        quantity,
+        rate_per_kg,
+        delivery_date,
+        payment_method,
+        notes,
+        total_amount,
+      } = deliveryData;
+
+      // Calculate total_amount if not provided
+      const calculatedTotal = total_amount || quantity * rate_per_kg;
+
+      // Use provided delivery_date or current date
+      const deliveryDateToUse =
+        delivery_date || new Date().toISOString().split("T")[0];
 
       const [result] = await db.execute(
-        "INSERT INTO deliveries (supplier_id, delivery_date, quantity, quality_score, rate_per_kg, total_amount) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO deliveries (supplier_id, delivery_date, quantity, rate_per_kg, total_amount, payment_method, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
           supplier_id,
-          new Date(),
+          deliveryDateToUse,
           quantity,
-          quality_score,
           rate_per_kg,
-          total_amount,
+          calculatedTotal,
+          payment_method || "monthly",
+          notes || null,
         ]
       );
 
@@ -106,9 +120,11 @@ class Delivery {
         id: result.insertId,
         supplier_id,
         quantity,
-        quality_score,
         rate_per_kg,
-        total_amount,
+        delivery_date: deliveryDateToUse,
+        total_amount: calculatedTotal,
+        payment_method: payment_method || "monthly",
+        notes: notes || null,
       };
     } catch (error) {
       throw new Error("Database error: " + error.message);
@@ -117,12 +133,22 @@ class Delivery {
 
   static async update(id, deliveryData) {
     try {
-      const { quantity, quality_score, rate_per_kg } = deliveryData;
+      const { quantity, rate_per_kg, delivery_date, payment_method, notes } =
+        deliveryData;
+
       const total_amount = quantity * rate_per_kg;
 
       const [result] = await db.execute(
-        "UPDATE deliveries SET quantity = ?, quality_score = ?, rate_per_kg = ?, total_amount = ? WHERE id = ?",
-        [quantity, quality_score, rate_per_kg, total_amount, id]
+        "UPDATE deliveries SET quantity = ?, rate_per_kg = ?, total_amount = ?, delivery_date = ?, payment_method = ?, notes = ? WHERE id = ?",
+        [
+          quantity,
+          rate_per_kg,
+          total_amount,
+          delivery_date,
+          payment_method,
+          notes,
+          id,
+        ]
       );
 
       return result.affectedRows > 0;

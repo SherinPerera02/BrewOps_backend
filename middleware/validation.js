@@ -185,6 +185,18 @@ const deliveryValidation = {
       .optional()
       .isFloat({ min: 0 })
       .withMessage("Rate per kg must be a positive number"),
+    body("delivery_date")
+      .optional()
+      .isISO8601()
+      .withMessage("Delivery date must be a valid date"),
+    body("payment_method")
+      .optional()
+      .isIn(["monthly", "spot"])
+      .withMessage("Payment method must be 'monthly' or 'spot'"),
+    body("notes")
+      .optional()
+      .isLength({ max: 500 })
+      .withMessage("Notes must not exceed 500 characters"),
   ],
 };
 
