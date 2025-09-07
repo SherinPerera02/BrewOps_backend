@@ -100,7 +100,7 @@ export async function loginUser(req, res) {
       return res.status(400).json({ message: "Invalid credentials" });
 
     // Generate JWT token
-    const token = jwt.sign(
+    const jwtToken = jwt.sign(
       {
         id: user.id,
         email: user.email,
@@ -112,7 +112,7 @@ export async function loginUser(req, res) {
     );
 
     // Return token and role
-    res.json({ message: "Login successful", token, role: user.role });
+    res.json({ message: "Login successful", jwtToken, role: user.role });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }

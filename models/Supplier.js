@@ -3,7 +3,10 @@ import db from "../config/database.js";
 class Supplier {
   static async findAll() {
     try {
-      const [rows] = await db.execute("SELECT * FROM suppliers ORDER BY name");
+      // Only return active suppliers by default
+      const [rows] = await db.execute(
+        "SELECT * FROM suppliers WHERE is_active = true ORDER BY name"
+      );
       return rows;
     } catch (error) {
       throw new Error("Database error: " + error.message);
@@ -37,20 +40,31 @@ class Supplier {
       const {
         name,
         contact_number,
+        nic_number,
+        address,
         bank_account_number,
         bank_name,
         rate = 150,
       } = supplierData;
 
-      // Generate supplier ID
-      const supplier_id = "SUP" + Date.now();
+      // Generate supplier ID in format SUP-YYYYMMDD-HHMM
+      const pad = (n) => n.toString().padStart(2, "0");
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = pad(now.getMonth() + 1);
+      const day = pad(now.getDate());
+      const hours = pad(now.getHours());
+      const minutes = pad(now.getMinutes());
+      const supplier_id = `SUP-${year}${month}${day}-${hours}${minutes}`;
 
       const [result] = await db.execute(
-        "INSERT INTO suppliers (supplier_id, name, contact_number, bank_account_number, bank_name, rate) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO suppliers (supplier_id, name, contact_number, nic_number, address, bank_account_number, bank_name, rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
           supplier_id,
           name,
           contact_number,
+          nic_number,
+          address,
           bank_account_number,
           bank_name,
           rate,
@@ -62,13 +76,21 @@ class Supplier {
         supplier_id,
         name,
         contact_number,
+        nic_number,
+        address,
         bank_account_number,
         bank_name,
         rate,
       };
     } catch (error) {
       if (error.code === "ER_DUP_ENTRY") {
-        throw new Error("Supplier ID already exists");
+        if (error.message.includes("unique_supplier_id")) {
+          throw new Error("Supplier ID already exists");
+        }
+        if (error.message.includes("unique_nic_number")) {
+          throw new Error("NIC number already exists");
+        }
+        throw new Error("Duplicate entry found");
       }
       throw new Error("Database error: " + error.message);
     }
@@ -79,17 +101,21 @@ class Supplier {
       const {
         name,
         contact_number,
+        nic_number,
+        address,
         bank_account_number,
         bank_name,
         rate,
-        is_active,
+        is_active = true, // Default to true if not provided
       } = supplierData;
 
       const [result] = await db.execute(
-        "UPDATE suppliers SET name = ?, contact_number = ?, bank_account_number = ?, bank_name = ?, rate = ?, is_active = ? WHERE id = ?",
+        "UPDATE suppliers SET name = ?, contact_number = ?, nic_number = ?, address = ?, bank_account_number = ?, bank_name = ?, rate = ?, is_active = ? WHERE id = ?",
         [
           name,
           contact_number,
+          nic_number,
+          address,
           bank_account_number,
           bank_name,
           rate,
@@ -100,6 +126,12 @@ class Supplier {
 
       return result.affectedRows > 0;
     } catch (error) {
+      if (error.code === "ER_DUP_ENTRY") {
+        if (error.message.includes("unique_nic_number")) {
+          throw new Error("NIC number already exists");
+        }
+        throw new Error("Duplicate entry found");
+      }
       throw new Error("Database error: " + error.message);
     }
   }
@@ -111,6 +143,30 @@ class Supplier {
         [id]
       );
       return result.affectedRows > 0;
+    } catch (error) {
+      throw new Error("Database error: " + error.message);
+    }
+  }
+
+  static async findByNIC(nic_number) {
+    try {
+      const [rows] = await db.execute(
+        "SELECT * FROM suppliers WHERE nic_number = ?",
+        [nic_number]
+      );
+      return rows[0];
+    } catch (error) {
+      throw new Error("Database error: " + error.message);
+    }
+  }
+
+  static async findBySupplierID(supplier_id) {
+    try {
+      const [rows] = await db.execute(
+        "SELECT * FROM suppliers WHERE supplier_id = ?",
+        [supplier_id]
+      );
+      return rows[0];
     } catch (error) {
       throw new Error("Database error: " + error.message);
     }

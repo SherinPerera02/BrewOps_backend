@@ -21,7 +21,7 @@ router.get("/:id", protect, supplierController.getSupplier);
 router.post(
   "/",
   protect,
-  authorize("admin", "manager"),
+  authorize("admin", "manager", "staff"),
   supplierValidation.create,
   handleValidation,
   supplierController.createSupplier
@@ -31,7 +31,7 @@ router.post(
 router.put(
   "/:id",
   protect,
-  authorize("admin", "manager"),
+  authorize("admin", "manager", "staff"),
   supplierValidation.update,
   handleValidation,
   supplierController.updateSupplier
@@ -41,7 +41,7 @@ router.put(
 router.delete(
   "/:id",
   protect,
-  authorize("admin"),
+  authorize("admin", "manager", "staff"),
   supplierController.deleteSupplier
 );
 

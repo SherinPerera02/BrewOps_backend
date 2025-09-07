@@ -33,12 +33,12 @@ const authController = {
         phone,
         employee_id,
       });
-      const token = generateToken(user.id);
+      const jwtToken = generateToken(user.id);
 
       res.status(201).json({
         success: true,
         message: "User registered successfully",
-        token,
+        jwtToken,
         user: {
           id: user.id,
           name: user.name,
@@ -89,12 +89,12 @@ const authController = {
         });
       }
 
-      const token = generateToken(user.id);
+      const jwtToken = generateToken(user.id);
 
       res.json({
         success: true,
         message: "Login successful",
-        token,
+        jwtToken,
         user: {
           id: user.id,
           name: user.name,

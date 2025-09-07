@@ -81,6 +81,26 @@ const supplierController = {
         data: supplier,
       });
     } catch (error) {
+      // Handle specific database constraint errors
+      if (error.message.includes("NIC number already exists")) {
+        return res.status(400).json({
+          success: false,
+          message: "A supplier with this NIC number already exists",
+        });
+      }
+      if (error.message.includes("Supplier ID already exists")) {
+        return res.status(400).json({
+          success: false,
+          message: "Supplier ID already exists. Please try again.",
+        });
+      }
+      if (error.message.includes("Duplicate entry")) {
+        return res.status(400).json({
+          success: false,
+          message: "A supplier with these details already exists",
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: "Error creating supplier",
