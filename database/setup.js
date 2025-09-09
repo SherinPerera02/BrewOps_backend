@@ -18,7 +18,7 @@ async function createDatabase() {
     connection = await mysql.createConnection({
       host: process.env.DB_HOST || "localhost",
       user: process.env.DB_USER || "root",
-      password: process.env.DB_PASSWORD || "Sherin2001@",
+      password: process.env.DB_PASSWORD || "Kodithuwakku#22",
       port: process.env.DB_PORT || 3306,
     });
 

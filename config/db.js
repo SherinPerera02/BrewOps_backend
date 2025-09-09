@@ -8,7 +8,7 @@ const createPool = () => {
     pool = mysql.createPool({
       host: process.env.DB_HOST || "localhost",
       user: process.env.DB_USER || "root",
-      password: process.env.DB_PASSWORD || "Sherin2001@",
+      password: process.env.DB_PASSWORD || "Kodithuwakku#22",
       database: process.env.DB_NAME || "brewops_db",
       port: process.env.DB_PORT || 3306,
       waitForConnections: true,
